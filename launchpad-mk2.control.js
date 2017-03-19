@@ -50,9 +50,15 @@ var trackColor		= [];
 var clipSlots		= [];
 var trackIsGroup	= [];
 var queuedPads		= [];
-var currentTime;
-
 var queuedPads		= [];
+
+var currentTime;
+var canScrollDown;
+var canScrollUp;
+var canScrollLeft;
+var canScrollRight;
+
+var launchpadMode = Mode.SESSION;
 
 function init()
 {
@@ -61,15 +67,35 @@ function init()
 
 	// create a trackbank (arguments are tracks, sends, scenes)
 	trackBank = host.createMasterTrack(0).createSiblingsTrackBank(NUM_TRACKS, NUM_SENDS, NUM_SCENES, false, false);
+	sceneBank = host.createSceneBank(NUM_SCENES);
 	transport = host.createTransport();
+
 	transport.getPosition().addTimeObserver(":", 2, 1, 1, 0, function(value){
 		currentTime = value;
 		updateQueuedPads();
 	});
 
+	trackBank.addCanScrollChannelsDownObserver(function(value){
+		canScrollRight = value;
+		updateTopButtons();
+	});
+	trackBank.addCanScrollChannelsUpObserver(function(value){
+		canScrollLeft = value;
+		updateTopButtons();
+	});
+	trackBank.addCanScrollScenesDownObserver(function(value){
+		canScrollDown = value;
+		updateTopButtons();
+	});
+	trackBank.addCanScrollScenesUpObserver(function(value){
+		canScrollUp = value;
+		updateTopButtons();
+	});
+
 	for (var i = 0; i < NUM_TRACKS; i++)
 	{
 		clipSlots[i] = trackBank.getTrack(i).getClipLauncherSlots();
+		clipSlots[i].setIndication(true);
 		clipSlots[i].addHasContentObserver(hasContentObserver(i));
 		clipSlots[i].addColorObserver(clipColorObserver(i));
 		clipSlots[i].addPlaybackStateObserver(playbackObserver(i));
@@ -139,6 +165,15 @@ function updatePads()
 			updatePad(t, c);
 		}
 	}
+}
+
+function updateTopButtons()
+{
+	setTopColor(LAUNCHPAD_BUTTON_UP, canScrollUp ? Color.WHITE : Color.BLACK);
+	setTopColor(LAUNCHPAD_BUTTON_DOWN, canScrollDown ? Color.WHITE : Color.BLACK);
+	setTopColor(LAUNCHPAD_BUTTON_LEFT, canScrollLeft ? Color.WHITE : Color.BLACK);
+	setTopColor(LAUNCHPAD_BUTTON_RIGHT, canScrollRight ? Color.WHITE : Color.BLACK);
+	setTopColor(LAUNCHPAD_BUTTON_SESSION, launchpadMode == Mode.SESSION ? Color.WHITE : Color.BLACK);
 }
 
 var isGroupObserver = function(channel)
@@ -217,27 +252,37 @@ var playbackObserver = function(channel)
 
 function onMidi(status, data1, data2)
 {
-	println(status + " " + data1 + " " + data2);
+	//println(status + " " + data1 + " " + data2);
 	if (status == LAUNCHPAD_BUTTON_STATUS && data2 == 127)
 	{
 		if (data1 == LAUNCHPAD_BUTTON_UP)
 		{
 			trackBank.scrollScenesPageUp();
+			sceneBank.scrollPageUp();
+			sceneBank.getScene(0).showInEditor();
+			sceneBank.getScene(0).selectInEditor();
+			//sceneBank.getScene(0).launch();
 			updatePads();
 		}
 		else if (data1 == LAUNCHPAD_BUTTON_DOWN)
 		{
 			trackBank.scrollScenesPageDown();
+			sceneBank.scrollPageDown();
+			sceneBank.getScene(0).showInEditor();
+			sceneBank.getScene(0).selectInEditor();
+			//sceneBank.getScene(0).launch();
 			updatePads();
 		}
 		else if (data1 == LAUNCHPAD_BUTTON_LEFT)
 		{
 			trackBank.scrollTracksUp();
+			//trackBank.getTrack(0).makeVisibleInMixer();
 			updatePads();
 		}
 		else if (data1 == LAUNCHPAD_BUTTON_RIGHT)
 		{
 			trackBank.scrollTracksDown();
+			//trackBank.getTrack(0).makeVisibleInMixer();
 			updatePads();
 		}
 	}
@@ -260,7 +305,10 @@ function getColorIndex(red, green, blue)
         if (Math.abs (color[0] - red ) < 0.0001 &&
             Math.abs (color[1] - green) < 0.0001 &&
             Math.abs (color[2] - blue) < 0.0001)
+		{
+			println(color[3]);
             return color[3];
+		}
     }
     return 0;
 };
@@ -302,6 +350,11 @@ function buttonToClip(button)
 function exit()
 {
    sendMidi(0xB8, 0x00, 0x00);
+}
+
+function setTopColor(button, color)
+{
+	sendMidi(0xB0, button, color);
 }
 
 function sendNote(note, velocity)
