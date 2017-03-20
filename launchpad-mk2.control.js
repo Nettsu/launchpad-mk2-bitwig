@@ -7,6 +7,10 @@ host.addDeviceNameBasedDiscoveryPair(["Launchpad MK2"], ["Launchpad MK2"]);
 //Load LaunchControl constants containing the status for pages and other constant variables
 load("launchpad-mk2.constants.js");
 
+var NUM_TRACKS = 9;
+var NUM_SENDS = 2;
+var NUM_SCENES = 8;
+
 var clipHasContent =
 [
 	[false, false, false, false, false, false, false, false],
@@ -50,9 +54,10 @@ var trackColor		= [];
 var clipSlots		= [];
 var trackIsGroup	= [];
 var queuedPads		= [];
-var queuedPads		= [];
 
 var currentTime;
+var curSideButtonConfig;
+
 var canScrollDown;
 var canScrollUp;
 var canScrollLeft;
@@ -72,9 +77,43 @@ function init()
 
 	transport.getPosition().addTimeObserver(":", 2, 1, 1, 0, function(value){
 		currentTime = value;
-		updateQueuedPads();
+		if (parseInt(currentTime.split(":")[2]) % 2 == 1)
+			updateQueuedPads();
 	});
 
+	var modWheelSetting = prefs.getEnumSetting("Side buttons", "Config", ["Launch scenes", "9th track"], "Launch scenes");
+    modWheelSetting.addValueObserver(function (value) {
+		if (value == "9th track")
+		{
+			curSideButtonConfig = sideButtonConfigs.NINTH_TRACK;
+			NUM_TRACKS = 9;
+		}
+		else if (value == "Launch scenes")
+		{
+			curSideButtonConfig = sideButtonConfigs.LAUNCH_SCENES;
+			NUM_TRACKS = 8;
+		}
+		updatePads();
+    });
+
+	addScrollingObservers();
+
+	for (var i = 0; i < NUM_TRACKS; i++)
+	{
+		clipSlots[i] = trackBank.getTrack(i).getClipLauncherSlots();
+		clipSlots[i].setIndication(true);
+		clipSlots[i].addHasContentObserver(hasContentObserver(i));
+		clipSlots[i].addColorObserver(clipColorObserver(i));
+		clipSlots[i].addPlaybackStateObserver(playbackObserver(i));
+		trackBank.getTrack(i).addColorObserver(trackColorObserver(i));
+		trackBank.getTrack(i).addIsGroupObserver(isGroupObserver(i));
+	}
+
+	updatePads();
+}
+
+function addScrollingObservers()
+{
 	trackBank.addCanScrollChannelsDownObserver(function(value){
 		canScrollRight = value;
 		updateTopButtons();
@@ -91,19 +130,6 @@ function init()
 		canScrollUp = value;
 		updateTopButtons();
 	});
-
-	for (var i = 0; i < NUM_TRACKS; i++)
-	{
-		clipSlots[i] = trackBank.getTrack(i).getClipLauncherSlots();
-		clipSlots[i].setIndication(true);
-		clipSlots[i].addHasContentObserver(hasContentObserver(i));
-		clipSlots[i].addColorObserver(clipColorObserver(i));
-		clipSlots[i].addPlaybackStateObserver(playbackObserver(i));
-		trackBank.getTrack(i).addColorObserver(trackColorObserver(i));
-		trackBank.getTrack(i).addIsGroupObserver(isGroupObserver(i));
-	}
-
-	updatePads();
 }
 
 function updatePad(track, clip)
@@ -117,6 +143,7 @@ function updatePad(track, clip)
 		if (playbackStates[track][clip] == PlaybackState.PLAYING)
 		{
 			setColor(track, clip, Color.WHITE);
+			//setColor(track, clip, Color.WHITE);
 		}
 		else if (playbackStates[track][clip] == PlaybackState.STOPDUE)
 		{
@@ -124,6 +151,7 @@ function updatePad(track, clip)
 		}
 		else if (playbackStates[track][clip] == PlaybackState.QUEUED)
 		{
+			//setBlinkColor(track, clip, Color.WHITE, defaultColor);
 			if (parseInt(currentTime.split(":")[2]) <= 2)
 			{
 				setColor(track, clip, Color.WHITE);
@@ -163,6 +191,13 @@ function updatePads()
 		for (var c = 0; c < NUM_SCENES; c++)
 		{
 			updatePad(t, c);
+		}
+	}
+	if (curSideButtonConfig == sideButtonConfigs.LAUNCH_SCENES)
+	{
+		for (var c = 0; c < NUM_SCENES; c++)
+		{
+			setColor(8, c, Color.WHITE);
 		}
 	}
 }
@@ -261,7 +296,6 @@ function onMidi(status, data1, data2)
 			sceneBank.scrollPageUp();
 			sceneBank.getScene(0).showInEditor();
 			sceneBank.getScene(0).selectInEditor();
-			//sceneBank.getScene(0).launch();
 			updatePads();
 		}
 		else if (data1 == LAUNCHPAD_BUTTON_DOWN)
@@ -270,7 +304,6 @@ function onMidi(status, data1, data2)
 			sceneBank.scrollPageDown();
 			sceneBank.getScene(0).showInEditor();
 			sceneBank.getScene(0).selectInEditor();
-			//sceneBank.getScene(0).launch();
 			updatePads();
 		}
 		else if (data1 == LAUNCHPAD_BUTTON_LEFT)
@@ -288,7 +321,14 @@ function onMidi(status, data1, data2)
 	}
 	if (status == LAUNCHPAD_PAD_STATUS && data2 == 127)
 	{
-		clipSlots[buttonToChannel(data1)].launch(buttonToClip(data1)) ;
+		if (curSideButtonConfig == configs.LAUNCH_SCENES && buttonToChannel(data1) == 8)
+		{
+			sceneBank.launchScene(buttonToClip(data1));
+		}
+		else
+		{
+			clipSlots[buttonToChannel(data1)].launch(buttonToClip(data1));
+		}
 	}
 }
 
@@ -306,7 +346,7 @@ function getColorIndex(red, green, blue)
             Math.abs (color[1] - green) < 0.0001 &&
             Math.abs (color[2] - blue) < 0.0001)
 		{
-			println(color[3]);
+			//println(color[3]);
             return color[3];
 		}
     }
@@ -321,6 +361,12 @@ function setColor(track, slot, index)
 	}
 	//println(index);
 	sendNote(BUTTON_MATRIX[track][slot], index);
+}
+
+function setBlinkColor(track, slot, index1, index2)
+{
+	//println(index);
+	sendMidi(0x91, BUTTON_MATRIX[track][slot], index1);
 }
 
 function setColorRGB(track, slot, r, g, b)
@@ -345,6 +391,11 @@ function buttonToChannel(button)
 function buttonToClip(button)
 {
 	return 9 - (button / 10);
+}
+
+function sendMidiClock()
+{
+	sendSysex("F8");
 }
 
 function exit()
