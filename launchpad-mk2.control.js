@@ -4,51 +4,12 @@ host.defineController("Novation", "Launchpad MK2 - Netsu", "1.0", "5290680d-7247
 host.defineMidiPorts(1, 1);
 host.addDeviceNameBasedDiscoveryPair(["Launchpad MK2"], ["Launchpad MK2"]);
 
-//Load LaunchControl constants containing the status for pages and other constant variables
 load("launchpad-mk2.constants.js");
+load("launchpad-mk2.utils.js");
 
-var NUM_TRACKS = 9;
-var NUM_SENDS = 2;
-var NUM_SCENES = 8;
-
-var clipHasContent =
-[
-	[false, false, false, false, false, false, false, false],
-	[false, false, false, false, false, false, false, false],
-	[false, false, false, false, false, false, false, false],
-	[false, false, false, false, false, false, false, false],
-	[false, false, false, false, false, false, false, false],
-	[false, false, false, false, false, false, false, false],
-	[false, false, false, false, false, false, false, false],
-	[false, false, false, false, false, false, false, false],
-	[false, false, false, false, false, false, false, false]
-];
-
-var playbackStates =
-[
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0]
-];
-
-var clipColor =
-[
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, 0, 0]
-];
+var clipHasContent = makeTable(NUM_TRACKS, NUM_SCENES, false);
+var playbackStates = makeTable(NUM_TRACKS, NUM_SCENES, PlaybackState.STOPPED);
+var clipColor 	   = makeTable(NUM_TRACKS, NUM_SCENES, Color.BLACK);
 
 var trackColor		= [];
 var clipSlots		= [];
@@ -57,6 +18,7 @@ var queuedPads		= [];
 
 var currentTime;
 var curSideButtonConfig;
+var launchpadTracks = NUM_TRACKS;
 
 var canScrollDown;
 var canScrollUp;
@@ -74,6 +36,7 @@ function init()
 	trackBank = host.createMasterTrack(0).createSiblingsTrackBank(NUM_TRACKS, NUM_SENDS, NUM_SCENES, false, false);
 	sceneBank = host.createSceneBank(NUM_SCENES);
 	transport = host.createTransport();
+	prefs     = host.getPreferences();
 
 	transport.getPosition().addTimeObserver(":", 2, 1, 1, 0, function(value){
 		currentTime = value;
@@ -85,13 +48,13 @@ function init()
     modWheelSetting.addValueObserver(function (value) {
 		if (value == "9th track")
 		{
-			curSideButtonConfig = sideButtonConfigs.NINTH_TRACK;
-			NUM_TRACKS = 9;
+			curSideButtonConfig = Configs.NINTH_TRACK;
+			launchpadTracks = NUM_TRACKS;
 		}
 		else if (value == "Launch scenes")
 		{
-			curSideButtonConfig = sideButtonConfigs.LAUNCH_SCENES;
-			NUM_TRACKS = 8;
+			curSideButtonConfig = Configs.LAUNCH_SCENES;
+			launchpadTracks = 8;
 		}
 		updatePads();
     });
@@ -132,8 +95,16 @@ function addScrollingObservers()
 	});
 }
 
+function firstBeatHalf()
+{
+	return parseInt(currentTime.split(":")[2]) <= 2;
+}
+
 function updatePad(track, clip)
 {
+	if (track == 8 && curSideButtonConfig == Configs.LAUNCH_SCENES)
+		return;
+
 	if (clipHasContent[track][clip])
 	{
 		var defaultColor = clipColor[track][clip];
@@ -143,23 +114,14 @@ function updatePad(track, clip)
 		if (playbackStates[track][clip] == PlaybackState.PLAYING)
 		{
 			setColor(track, clip, Color.WHITE);
-			//setColor(track, clip, Color.WHITE);
 		}
 		else if (playbackStates[track][clip] == PlaybackState.STOPDUE)
 		{
-			setColor(track, clip, Color.WHITE);
+			//setColor(track, clip, Color.GREY_MD);
 		}
 		else if (playbackStates[track][clip] == PlaybackState.QUEUED)
 		{
-			//setBlinkColor(track, clip, Color.WHITE, defaultColor);
-			if (parseInt(currentTime.split(":")[2]) <= 2)
-			{
-				setColor(track, clip, Color.WHITE);
-			}
-			else
-			{
-				setColor(track, clip, defaultColor);
-			}
+			setColor(track, clip, firstBeatHalf() ? Color.WHITE : defaultColor);
 		}
 		else
 		{
@@ -174,7 +136,7 @@ function updatePad(track, clip)
 
 function updateQueuedPads()
 {
-	for (var t = 0; t < NUM_TRACKS; t++)
+	for (var t = 0; t < launchpadTracks; t++)
     {
 		for (var c = 0; c < NUM_SCENES; c++)
 		{
@@ -186,14 +148,15 @@ function updateQueuedPads()
 
 function updatePads()
 {
-    for (var t = 0; t < NUM_TRACKS; t++)
+	//println(launchpadTracks + " " + curSideButtonConfig);
+    for (var t = 0; t < launchpadTracks; t++)
     {
 		for (var c = 0; c < NUM_SCENES; c++)
 		{
 			updatePad(t, c);
 		}
 	}
-	if (curSideButtonConfig == sideButtonConfigs.LAUNCH_SCENES)
+	if (curSideButtonConfig == Configs.LAUNCH_SCENES)
 	{
 		for (var c = 0; c < NUM_SCENES; c++)
 		{
@@ -250,7 +213,6 @@ var clipColorObserver = function(channel)
     var ch = channel;
     return function (index, red, green, blue)
 		{
-			//println((red * 255) + " " + (green*255) + " " + (blue*255));
 			var color = getColorIndex(red, green, blue);
 			//println(color);
 			clipColor[ch][index] = color;
@@ -271,7 +233,7 @@ var playbackObserver = function(channel)
 			}
 			else if (state == 0 && queued)
 			{
-				//playbackStates[ch][slot] = PlaybackState.STOPDUE;
+				playbackStates[ch][slot] = PlaybackState.STOPDUE;
 			}
 			else if (state == 1 && queued)
 			{
@@ -295,33 +257,31 @@ function onMidi(status, data1, data2)
 			trackBank.scrollScenesPageUp();
 			sceneBank.scrollPageUp();
 			sceneBank.getScene(0).showInEditor();
-			sceneBank.getScene(0).selectInEditor();
 			updatePads();
 		}
 		else if (data1 == LAUNCHPAD_BUTTON_DOWN)
 		{
 			trackBank.scrollScenesPageDown();
 			sceneBank.scrollPageDown();
-			sceneBank.getScene(0).showInEditor();
-			sceneBank.getScene(0).selectInEditor();
+			sceneBank.getScene(NUM_SCENES - 1).showInEditor();
 			updatePads();
 		}
 		else if (data1 == LAUNCHPAD_BUTTON_LEFT)
 		{
 			trackBank.scrollTracksUp();
-			//trackBank.getTrack(0).makeVisibleInMixer();
+			trackBank.getTrack(0).makeVisibleInMixer();
 			updatePads();
 		}
 		else if (data1 == LAUNCHPAD_BUTTON_RIGHT)
 		{
 			trackBank.scrollTracksDown();
-			//trackBank.getTrack(0).makeVisibleInMixer();
+			trackBank.getTrack(NUM_TRACKS - 1).makeVisibleInMixer();
 			updatePads();
 		}
 	}
 	if (status == LAUNCHPAD_PAD_STATUS && data2 == 127)
 	{
-		if (curSideButtonConfig == configs.LAUNCH_SCENES && buttonToChannel(data1) == 8)
+		if (curSideButtonConfig == Configs.LAUNCH_SCENES && buttonToChannel(data1) == 8)
 		{
 			sceneBank.launchScene(buttonToClip(data1));
 		}
@@ -332,83 +292,7 @@ function onMidi(status, data1, data2)
 	}
 }
 
-function toHex(d)
-{
-    return  ("0"+(Number(Math.round(d)).toString(16))).slice(-2).toUpperCase()
-}
-
-function getColorIndex(red, green, blue)
-{
-    for (var i = 0; i < COLORS.length; i++)
-    {
-        var color = COLORS[i];
-        if (Math.abs (color[0] - red ) < 0.0001 &&
-            Math.abs (color[1] - green) < 0.0001 &&
-            Math.abs (color[2] - blue) < 0.0001)
-		{
-			//println(color[3]);
-            return color[3];
-		}
-    }
-    return 0;
-};
-
-function setColor(track, slot, index)
-{
-	if (index >= 128)
-	{
-		index = 0;
-	}
-	//println(index);
-	sendNote(BUTTON_MATRIX[track][slot], index);
-}
-
-function setBlinkColor(track, slot, index1, index2)
-{
-	//println(index);
-	sendMidi(0x91, BUTTON_MATRIX[track][slot], index1);
-}
-
-function setColorRGB(track, slot, r, g, b)
-{
-	var index = getColorIndex(r, g, b);
-	sendNote(BUTTON_MATRIX[track][slot], index);
-}
-
-function setColorSysex(track, slot, r, g, b)
-{
-	var buttonInHex = toHex(BUTTON_MATRIX[track][slot]);
-	var sysexString = SYSEX_HEADER + "0B " + buttonInHex + " " + toHex(r*63) + " " + toHex(g*63) + " " + toHex(b*63) + " F7";
-	println(sysexString);
-	sendSysex(sysexString);
-}
-
-function buttonToChannel(button)
-{
-	return (button % 10) - 1;
-}
-
-function buttonToClip(button)
-{
-	return 9 - (button / 10);
-}
-
-function sendMidiClock()
-{
-	sendSysex("F8");
-}
-
 function exit()
 {
    sendMidi(0xB8, 0x00, 0x00);
-}
-
-function setTopColor(button, color)
-{
-	sendMidi(0xB0, button, color);
-}
-
-function sendNote(note, velocity)
-{
-    sendMidi(0x90, note, velocity);
 }
