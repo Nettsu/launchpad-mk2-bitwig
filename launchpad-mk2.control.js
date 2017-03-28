@@ -10,8 +10,10 @@ load("launchpad-mk2.utils.js");
 var clipHasContent = makeTable(NUM_TRACKS, NUM_SCENES, false);
 var playbackStates = makeTable(NUM_TRACKS, NUM_SCENES, PlaybackState.STOPPED);
 var clipColor 	   = makeTable(NUM_TRACKS, NUM_SCENES, Color.BLACK);
+var clipColorRGB   = makeTable(NUM_TRACKS, NUM_SCENES, [0, 0, 0]);
 
 var trackColor		= [];
+var trackColorRGB	= [];
 var clipSlots		= [];
 var trackIsGroup	= [];
 var queuedPads		= [];
@@ -45,7 +47,7 @@ function init()
 	});
 
 	var modWheelSetting = prefs.getEnumSetting("Side buttons", "Config", ["Launch scenes", "9th track"], "Launch scenes");
-    modWheelSetting.addValueObserver(function (value) {
+	modWheelSetting.addValueObserver(function (value) {
 		if (value == "9th track")
 		{
 			curSideButtonConfig = Configs.NINTH_TRACK;
@@ -57,7 +59,7 @@ function init()
 			launchpadTracks = 8;
 		}
 		updatePads();
-    });
+	});
 
 	addScrollingObservers();
 
@@ -111,6 +113,10 @@ function updatePad(track, clip)
 		if (trackIsGroup[track])
 			defaultColor = trackColor[track];
 
+		var defaultColorRGB = clipColorRGB[track][clip];
+		if (trackIsGroup[track])
+			defaultColorRGB = trackColorRGB[track];
+
 		if (playbackStates[track][clip] == PlaybackState.PLAYING)
 		{
 			setColor(track, clip, Color.WHITE);
@@ -126,10 +132,12 @@ function updatePad(track, clip)
 		else
 		{
 			setColor(track, clip, defaultColor);
+			//queueSysexColor(track, clip, defaultColorRGB[0], defaultColorRGB[1], defaultColorRGB[2]);
 		}
 	}
 	else
 	{
+		//setColorSysex(track, clip, 0, 0, 0);
 		setColor(track, clip, Color.BLACK);
 	}
 }
@@ -204,6 +212,7 @@ var trackColorObserver = function(channel)
 			//println((red * 255) + " " + (green*255) + " " + (blue*255));
 			var color = getColorIndex(red, green, blue);
 			trackColor[ch] = color;
+			trackColorRGB[ch] = [red, green, blue];
 			updatePads();
 		}
 };
@@ -216,6 +225,7 @@ var clipColorObserver = function(channel)
 			var color = getColorIndex(red, green, blue);
 			//println(color);
 			clipColor[ch][index] = color;
+			clipColorRGB[ch][index] = [red, green, blue];
 			updatePad(ch, index);
 		}
 };

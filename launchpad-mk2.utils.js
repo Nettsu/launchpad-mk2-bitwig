@@ -1,3 +1,5 @@
+var queuedColorUpdates = "";
+
 function toHex(d)
 {
     return  ("0"+(Number(Math.round(d)).toString(16))).slice(-2).toUpperCase()
@@ -47,10 +49,40 @@ function setTopColor(button, index)
 	sendMidi(TOP_CHANNEL, button, index);
 }
 
-function setColorSysex(track, slot, r, g, b)
+function queueSysexColor(track, slot, r, g, b)
 {
+	r = r * r * 63;
+	g = g * g * 63;
+	b = b * b * 63;
 	var buttonInHex = toHex(getButtonNumber(track, slot));
-	var sysexString = SYSEX_HEADER + "0B " + buttonInHex + " " + toHex(r*63) + " " + toHex(g*63) + " " + toHex(b*63) + " F7";
+	var colorString = " " + buttonInHex + " " + toHex(r) + " " + toHex(g) + " " + toHex(b);
+
+	queuedColorUpdates += colorString;
+}
+
+function flushQueuedSysexColors()
+{
+	if (queuedColorUpdates != "")
+	{
+		var sysexString = SYSEX_HEADER + "0B" + queuedColorUpdates + " F7";
+		sendSysex(sysexString);
+		queuedColorUpdates = "";
+	}
+}
+
+function setSysexColor(track, slot, r, g, b)
+{
+	// r, g and b are a value between 0 and 1, need to multiply 63 to get Launchpad scope
+	// also launchpad LEDs light up non-linearly, so I make the scale exponential
+
+	r = r * r * 63;
+	g = g * g * 63;
+	b = b * b * 63;
+
+	//println(r + " " + g + " " + b);
+
+	var buttonInHex = toHex(getButtonNumber(track, slot));
+	var sysexString = SYSEX_HEADER + "0B " + buttonInHex + " " + toHex(r) + " " + toHex(g) + " " + toHex(b) + " F7";
 	sendSysex(sysexString);
 }
 
