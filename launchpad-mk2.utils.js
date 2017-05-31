@@ -114,7 +114,7 @@ function buttonToChannel(button)
 // clip numbering is 1-based
 function buttonToClip(button)
 {
-	return 9 - (button / 10);
+	return Math.floor(9 - (button / 10));
 }
 
 function sendMidiClock()

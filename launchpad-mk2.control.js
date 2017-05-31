@@ -19,7 +19,6 @@ var trackIsGroup	= [];
 var queuedPads		= [];
 
 var currentTime;
-var curSideButtonConfig;
 var launchpadTracks = NUM_TRACKS;
 
 var canScrollDown;
@@ -27,7 +26,14 @@ var canScrollUp;
 var canScrollLeft;
 var canScrollRight;
 
+var user1Held = false;
+var user2Held = false;
+
+var currentScene = 0;
+
 var launchpadMode = Mode.SESSION;
+var launchpadSideMode = SideMode.SCENES;
+var defaultSideMode = SideMode.SCENES;
 
 function init()
 {
@@ -50,12 +56,12 @@ function init()
 	modWheelSetting.addValueObserver(function (value) {
 		if (value == "9th track")
 		{
-			curSideButtonConfig = Configs.NINTH_TRACK;
+			defaultSideMode = SideMode.CLIPS;
 			launchpadTracks = NUM_TRACKS;
 		}
 		else if (value == "Launch scenes")
 		{
-			curSideButtonConfig = Configs.LAUNCH_SCENES;
+			defaultSideMode = SideMode.SCENES;
 			launchpadTracks = 8;
 		}
 		updatePads();
@@ -95,6 +101,10 @@ function addScrollingObservers()
 		canScrollUp = value;
 		updateTopButtons();
 	});
+	trackBank.addSceneScrollPositionObserver(function (value) {
+		currentScene = value;
+		updatePads();
+	}, 0);
 }
 
 function firstBeatHalf()
@@ -104,10 +114,22 @@ function firstBeatHalf()
 
 function updatePad(track, clip)
 {
-	if (track == 8 && curSideButtonConfig == Configs.LAUNCH_SCENES)
-		return;
-
-	if (clipHasContent[track][clip])
+	if (track == 8 && launchpadSideMode == SideMode.SCENES)
+	{
+		setColor(track, clip, Color.WHITE);
+	}
+	else if (track == 8 && launchpadSideMode == SideMode.MAP)
+	{
+		if (currentScene == clip * 8)
+		{
+			setColor(track, clip, Color.WHITE);
+		}
+		else
+		{
+			setColor(track, clip, Color.GREEN);
+		}
+	}
+	else if (clipHasContent[track][clip])
 	{
 		var defaultColor = clipColor[track][clip];
 		if (trackIsGroup[track])
@@ -157,18 +179,11 @@ function updateQueuedPads()
 function updatePads()
 {
 	//println(launchpadTracks + " " + curSideButtonConfig);
-    for (var t = 0; t < launchpadTracks; t++)
+    for (var t = 0; t < NUM_TRACKS; t++)
     {
 		for (var c = 0; c < NUM_SCENES; c++)
 		{
 			updatePad(t, c);
-		}
-	}
-	if (curSideButtonConfig == Configs.LAUNCH_SCENES)
-	{
-		for (var c = 0; c < NUM_SCENES; c++)
-		{
-			setColor(8, c, Color.WHITE);
 		}
 	}
 }
@@ -180,6 +195,9 @@ function updateTopButtons()
 	setTopColor(LAUNCHPAD_BUTTON_LEFT, canScrollLeft ? Color.WHITE : Color.BLACK);
 	setTopColor(LAUNCHPAD_BUTTON_RIGHT, canScrollRight ? Color.WHITE : Color.BLACK);
 	setTopColor(LAUNCHPAD_BUTTON_SESSION, launchpadMode == Mode.SESSION ? Color.WHITE : Color.BLACK);
+	setTopColor(LAUNCHPAD_BUTTON_USER1, launchpadSideMode == SideMode.MAP ? Color.WHITE : Color.BLACK);
+	setTopColor(LAUNCHPAD_BUTTON_USER2, launchpadSideMode == SideMode.CLIPS ? Color.WHITE : Color.BLACK);
+	setTopColor(LAUNCHPAD_BUTTON_MIXER, launchpadSideMode == SideMode.SCENES ? Color.WHITE : Color.BLACK);
 }
 
 var isGroupObserver = function(channel)
@@ -288,12 +306,35 @@ function onMidi(status, data1, data2)
 			trackBank.getTrack(NUM_TRACKS - 1).makeVisibleInMixer();
 			updatePads();
 		}
+		else if (data1 == LAUNCHPAD_BUTTON_USER1)
+		{
+			launchpadSideMode = SideMode.MAP;
+			updatePads();
+		}
+		else if (data1 == LAUNCHPAD_BUTTON_USER2)
+		{
+			launchpadSideMode = SideMode.CLIPS;
+			updatePads();
+		}
+		else if (data1 == LAUNCHPAD_BUTTON_MIXER)
+		{
+			launchpadSideMode = SideMode.SCENES;
+			updatePads();
+		}
+		updateTopButtons();
 	}
+
 	if (status == LAUNCHPAD_PAD_STATUS && data2 == 127)
 	{
-		if (curSideButtonConfig == Configs.LAUNCH_SCENES && buttonToChannel(data1) == 8)
+		if (launchpadSideMode == SideMode.SCENES && buttonToChannel(data1) == 8)
 		{
-			sceneBank.launchScene(buttonToClip(data1));
+			trackBank.launchScene(buttonToClip(data1));
+		}
+		else if (launchpadSideMode == SideMode.MAP && buttonToChannel(data1) == 8)
+		{
+			println(buttonToClip(data1) * NUM_SCENES);
+			trackBank.scrollToScene(buttonToClip(data1) * NUM_SCENES);
+			//sceneBank.scrollTo(buttonToClip(data1) * NUM_SCENES);
 		}
 		else
 		{

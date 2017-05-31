@@ -16,15 +16,9 @@ var LAUNCHPAD_BUTTON_DOWN      = 105;
 var LAUNCHPAD_BUTTON_LEFT      = 106;
 var LAUNCHPAD_BUTTON_RIGHT     = 107;
 var LAUNCHPAD_BUTTON_SESSION   = 108;
-var LAUNCHPAD_BUTTON_NOTE      = 109;
-var LAUNCHPAD_BUTTON_DEVICE    = 110;
-var LAUNCHPAD_BUTTON_USER      = 111;
-
-var Configs =
-{
-    LAUNCH_SCENES:0,
-    NINTH_TRACK:1
-};
+var LAUNCHPAD_BUTTON_USER1     = 109;
+var LAUNCHPAD_BUTTON_USER2     = 110;
+var LAUNCHPAD_BUTTON_MIXER     = 111;
 
 var Color = // Novation are from the UK
 {
@@ -128,6 +122,13 @@ var Mode =
     USER1:1,
     USER2:2,
     MIXER:3
+};
+
+var SideMode =
+{
+    SCENES:0,
+    CLIPS:1,
+    MAP:2
 };
 
 var PlaybackState =
