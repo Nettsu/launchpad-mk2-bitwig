@@ -1,4 +1,4 @@
-loadAPI(1);
+loadAPI(2);
 
 host.defineController("Novation", "Launchpad MK2 - Netsu", "1.0", "5290680d-7247-4047-b903-0534ea4bf59b", "Netsu");
 host.defineMidiPorts(1, 1);
@@ -35,6 +35,8 @@ var launchpadMode = Mode.SESSION;
 var launchpadSideMode = SideMode.SCENES;
 var defaultSideMode = SideMode.SCENES;
 
+var barNum16;
+
 function init()
 {
 	// Setup MIDI in stuff
@@ -46,25 +48,16 @@ function init()
 	transport = host.createTransport();
 	prefs     = host.getPreferences();
 
-	transport.getPosition().addTimeObserver(":", 2, 1, 1, 0, function(value){
+	transport.getPosition().addTimeObserver(":", 2, 1, 1, 0  , function(value)
+	{
 		currentTime = value;
-		if (parseInt(currentTime.split(":")[2]) % 2 == 1)
+		timeTable = currentTime.split(":");
+		barNum16 = timeTable[0] % 16;
+		updateTopButtons();
+		if (parseInt(timeTable[2]) % 2 == 1)
+		{
 			updateQueuedPads();
-	});
-
-	var modWheelSetting = prefs.getEnumSetting("Side buttons", "Config", ["Launch scenes", "9th track"], "Launch scenes");
-	modWheelSetting.addValueObserver(function (value) {
-		if (value == "9th track")
-		{
-			defaultSideMode = SideMode.CLIPS;
-			launchpadTracks = NUM_TRACKS;
 		}
-		else if (value == "Launch scenes")
-		{
-			defaultSideMode = SideMode.SCENES;
-			launchpadTracks = 8;
-		}
-		updatePads();
 	});
 
 	addScrollingObservers();
@@ -110,6 +103,11 @@ function addScrollingObservers()
 function firstBeatHalf()
 {
 	return parseInt(currentTime.split(":")[2]) <= 2;
+}
+
+function firstBeatQuarter()
+{
+	return parseInt(currentTime.split(":")[2]) <= 1;
 }
 
 function updatePad(track, clip)
@@ -190,14 +188,37 @@ function updatePads()
 
 function updateTopButtons()
 {
+	var activeColor = Color.RED_HI;
+	if (!firstBeatHalf())
+	{
+		activeColor = Color.OFF;
+	}
+	
 	setTopColor(LAUNCHPAD_BUTTON_UP, canScrollUp ? Color.WHITE : Color.BLACK);
 	setTopColor(LAUNCHPAD_BUTTON_DOWN, canScrollDown ? Color.WHITE : Color.BLACK);
 	setTopColor(LAUNCHPAD_BUTTON_LEFT, canScrollLeft ? Color.WHITE : Color.BLACK);
 	setTopColor(LAUNCHPAD_BUTTON_RIGHT, canScrollRight ? Color.WHITE : Color.BLACK);
-	setTopColor(LAUNCHPAD_BUTTON_SESSION, launchpadMode == Mode.SESSION ? Color.WHITE : Color.BLACK);
+	setTopColor(LAUNCHPAD_BUTTON_SESSION, activeColor);
 	setTopColor(LAUNCHPAD_BUTTON_USER1, launchpadSideMode == SideMode.MAP ? Color.WHITE : Color.BLACK);
 	setTopColor(LAUNCHPAD_BUTTON_USER2, launchpadSideMode == SideMode.CLIPS ? Color.WHITE : Color.BLACK);
 	setTopColor(LAUNCHPAD_BUTTON_MIXER, launchpadSideMode == SideMode.SCENES ? Color.WHITE : Color.BLACK);
+
+	//println(barNum16);
+
+	/*if (barNum16 > 0)
+	{
+		setTopColor(LAUNCHPAD_BUTTON_SESSION, barNum16 % 2 ? activeColor : Color.BLACK);
+		setTopColor(LAUNCHPAD_BUTTON_USER1, Math.floor(barNum16 / 2) % 2 ? activeColor : Color.BLACK);
+		setTopColor(LAUNCHPAD_BUTTON_USER2, Math.floor(barNum16 / 4) % 2 ? activeColor : Color.BLACK);
+		setTopColor(LAUNCHPAD_BUTTON_MIXER, Math.floor(barNum16 / 8) % 2? activeColor : Color.BLACK);
+	}
+	else
+	{
+		setTopColor(LAUNCHPAD_BUTTON_SESSION, activeColor);
+		setTopColor(LAUNCHPAD_BUTTON_USER1, activeColor);
+		setTopColor(LAUNCHPAD_BUTTON_USER2, activeColor);
+		setTopColor(LAUNCHPAD_BUTTON_MIXER, activeColor);
+	}*/
 }
 
 var isGroupObserver = function(channel)
