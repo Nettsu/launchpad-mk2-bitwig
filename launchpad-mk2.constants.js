@@ -116,12 +116,41 @@ var BITWIG_COLOR_MAP =
     [ 0.266 , 0.784 , 1.000 , 37]    // Blue
 ];
 
+var R_KEY = Color.SKY_OCEAN;
+var W_KEY = Color.OCEAN_LO;
+var B_KEY = Color.BLACK;
+var PRESSED_KEY = Color.WHITE;
+
+var rootC = 48;
+
+var isomorphicNotes =
+[
+	[ 0,  1,  2,  3,  4,  5,  6,  7],
+	[ 5,  6,  7,  8,  9, 10, 11, 12],
+	[10, 11, 12, 13, 14, 15, 16, 17],
+	[15, 16, 17, 18, 19, 20, 21, 22],
+	[20, 21, 22, 23, 24, 25, 26, 27],
+	[25, 26, 27, 28, 29, 30, 31, 32],
+	[30, 31, 32, 33, 34, 35, 36, 37],
+	[35, 36, 37, 38, 39, 40, 41, 42]
+];
+
+var isomorphicColours =
+[
+	[W_KEY, R_KEY, B_KEY, W_KEY, B_KEY, W_KEY, W_KEY, B_KEY],
+	[B_KEY, W_KEY, B_KEY, W_KEY, B_KEY, W_KEY, R_KEY, B_KEY],
+	[B_KEY, W_KEY, B_KEY, W_KEY, W_KEY, B_KEY, W_KEY, B_KEY],
+	[B_KEY, W_KEY, B_KEY, W_KEY, R_KEY, B_KEY, W_KEY, B_KEY],
+	[B_KEY, W_KEY, W_KEY, B_KEY, W_KEY, B_KEY, W_KEY, B_KEY],
+	[B_KEY, W_KEY, R_KEY, B_KEY, W_KEY, B_KEY, W_KEY, W_KEY],
+	[W_KEY, B_KEY, W_KEY, B_KEY, W_KEY, B_KEY, W_KEY, R_KEY],
+	[R_KEY, B_KEY, W_KEY, B_KEY, W_KEY, W_KEY, B_KEY, W_KEY]
+];
+
 var Mode =
 {
-    SESSION:0,
-    USER1:1,
-    USER2:2,
-    MIXER:3
+    LAUNCHER:0,
+    KEYBOARD:1
 };
 
 var SideMode =

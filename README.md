@@ -15,3 +15,6 @@ The right side buttons are configurable:
   you are currently at.
 - The 'User 2' button turns them into a 9th column of clip launching buttons
 - The 'Mixer' button makes them launch scenes
+
+Press the 'Session' button to switch between clip launcher and an isomorphic
+keyboard mode (Push-style layout).
