@@ -13,12 +13,15 @@ var clipColor 	   = makeTable(NUM_TRACKS, NUM_SCENES, Color.BLACK);
 var clipColorRGB   = makeTable(NUM_TRACKS, NUM_SCENES, [0, 0, 0]);
 var padPressed     = makeTable(NUM_TRACKS, NUM_SCENES, false);
 
+var notePressed = makeArray(43, false);
+
 var trackColor		= [];
 var trackColorRGB	= [];
 var clipSlots		= [];
 var trackIsGroup	= [];
 var queuedPads		= [];
 
+var barNum16;
 var currentTime;
 var launchpadTracks = NUM_TRACKS;
 
@@ -36,31 +39,22 @@ var launchpadMode = Mode.LAUNCHER;
 var launchpadSideMode = SideMode.SCENES;
 var defaultSideMode = SideMode.SCENES;
 
-var barNum16;
+var velocityLevel 	 = 6;
+var velocityMap 	 = makeArray(128, velocityLevel * 16 - 1);
+var transpositionMap = makeArray(128, -1);
+var emptyMap		 = makeArray(128, -1);
 
-var transpositionMap = [];
-var emptyMap = [];
 
 function init()
 {
-	for (var i = 0; i < 128; i++)
-	{
-		transpositionMap.push(-1);
-		emptyMap.push(-1);
-	}
+	initMaps();
 
-	for (var row = 1; row <= 8; row++) // grid row
-	{
-		for (var col = 1; col <= 8; col++) // grid column
-		{
-			transpositionMap[row * 10 + col] = isomorphicNotes[row-1][col-1] + rootC;
-		}
-	}
-	
 	// Setup MIDI in stuff
 	host.getMidiInPort(0).setMidiCallback(onMidi);
 	LaunchpadNotes = host.getMidiInPort(0).createNoteInput("Launchpad", "??????");
     LaunchpadNotes.setShouldConsumeEvents(false);
+	LaunchpadNotes.setKeyTranslationTable(emptyMap);
+    LaunchpadNotes.setVelocityTranslationTable(velocityMap);
 
 	// create a trackbank (arguments are tracks, sends, scenes)
 	trackBank = host.createMasterTrack(0).createSiblingsTrackBank(NUM_TRACKS, NUM_SENDS, NUM_SCENES, false, false);
@@ -71,7 +65,7 @@ function init()
 	transport.getPosition().addTimeObserver(":", 2, 1, 1, 0  , function(value)
 	{
 		currentTime = value;
-		timeTable = currentTime.split(":");
+		var timeTable = currentTime.split(":");
 		barNum16 = timeTable[0] % 16;
 		updateTopButtons();
 		if (parseInt(timeTable[2]) % 2 == 1)
@@ -96,6 +90,17 @@ function init()
 	updatePads();
 }
 
+function initMaps()
+{
+	for (var row = 1; row <= 8; row++) // grid row
+	{
+		for (var col = 1; col <= 8; col++) // grid column
+		{
+			transpositionMap[(9-row) * 10 + col] = isomorphicNotes[row-1][col-1] + rootC;
+		}
+	}
+}
+
 function getColours()
 {
 	for (var i = 0; i < NUM_TRACKS; i++)
@@ -106,7 +111,6 @@ function getColours()
 		var color = getColorIndex(red, green, blue);
 		trackColor[i] = color;
 		trackColorRGB[i] = [red, green, blue];
-		println(color);
 	}
 }
 
@@ -146,7 +150,11 @@ function firstBeatQuarter()
 
 function updatePad(track, clip)
 {
-	if (launchpadMode == Mode.LAUNCHER)
+	if (padPressed[track][clip])
+	{
+		setColor(track, clip, Color.WHITE);
+	}
+	else if (launchpadMode == Mode.LAUNCHER)
 	{
 		if (track == 8 && launchpadSideMode == SideMode.SCENES)
 		{
@@ -179,7 +187,7 @@ function updatePad(track, clip)
 			}
 			else if (playbackStates[track][clip] == PlaybackState.STOPDUE)
 			{
-				//setColor(track, clip, Color.GREY_MD);
+				setColor(track, clip, Color.WHITE);
 			}
 			else if (playbackStates[track][clip] == PlaybackState.QUEUED)
 			{
@@ -199,20 +207,32 @@ function updatePad(track, clip)
 	}
 	else if (launchpadMode == Mode.KEYBOARD)
 	{
-		if (padPressed[track][clip])
+		if (track == 8 && velocityLevel == 8 - clip)
 		{
 			setColor(track, clip, Color.WHITE);
 		}
+		else if (track == 8)
+		{
+			setColor(track, clip, Color.BLACK);
+		}
 		else
 		{
-			setColor(track, clip, isomorphicColours[clip][track]);
+			var note = isomorphicNotes[clip][track];
+			if (notePressed[note])
+			{
+				setColor(track, clip, Color.WHITE);
+			}
+			else
+			{
+				setColor(track, clip, isomorphicColours[clip][track]);
+			}
 		}
 	}
 }
 
 function updateQueuedPads()
 {
-	for (var t = 0; t < launchpadTracks; t++)
+	for (var t = 0; t < NUM_TRACKS; t++)
     {
 		for (var c = 0; c < NUM_SCENES; c++)
 		{
@@ -251,23 +271,6 @@ function updateTopButtons()
 	setTopColor(LAUNCHPAD_BUTTON_USER1, launchpadSideMode == SideMode.MAP ? Color.WHITE : Color.BLACK);
 	setTopColor(LAUNCHPAD_BUTTON_USER2, launchpadSideMode == SideMode.CLIPS ? Color.WHITE : Color.BLACK);
 	setTopColor(LAUNCHPAD_BUTTON_MIXER, launchpadSideMode == SideMode.SCENES ? Color.WHITE : Color.BLACK);
-
-	//println(barNum16);
-
-	/*if (barNum16 > 0)
-	{
-		setTopColor(LAUNCHPAD_BUTTON_SESSION, barNum16 % 2 ? activeColor : Color.BLACK);
-		setTopColor(LAUNCHPAD_BUTTON_USER1, Math.floor(barNum16 / 2) % 2 ? activeColor : Color.BLACK);
-		setTopColor(LAUNCHPAD_BUTTON_USER2, Math.floor(barNum16 / 4) % 2 ? activeColor : Color.BLACK);
-		setTopColor(LAUNCHPAD_BUTTON_MIXER, Math.floor(barNum16 / 8) % 2? activeColor : Color.BLACK);
-	}
-	else
-	{
-		setTopColor(LAUNCHPAD_BUTTON_SESSION, activeColor);
-		setTopColor(LAUNCHPAD_BUTTON_USER1, activeColor);
-		setTopColor(LAUNCHPAD_BUTTON_USER2, activeColor);
-		setTopColor(LAUNCHPAD_BUTTON_MIXER, activeColor);
-	}*/
 }
 
 var isGroupObserver = function(channel)
@@ -325,7 +328,6 @@ var playbackObserver = function(channel)
     var ch = channel;
     return function (slot, state, queued)
 		{
-			//println(ch + " " + slot + " " + state + " " + queued);
 			if (state == 0 && !queued)
 			{
 				playbackStates[ch][slot] = PlaybackState.STOPPED;
@@ -408,37 +410,67 @@ function onMidi(status, data1, data2)
 		}
 		updateTopButtons();
 	}
-
-	if (status == LAUNCHPAD_PAD_STATUS && data2 == 127 && launchpadMode == Mode.LAUNCHER)
-	{
-		if (launchpadSideMode == SideMode.SCENES && buttonToChannel(data1) == 8)
-		{
-			trackBank.launchScene(buttonToClip(data1));
-		}
-		else if (launchpadSideMode == SideMode.MAP && buttonToChannel(data1) == 8)
-		{
-			println(buttonToClip(data1) * NUM_SCENES);
-			trackBank.scrollToScene(buttonToClip(data1) * NUM_SCENES);
-			//sceneBank.scrollTo(buttonToClip(data1) * NUM_SCENES);
-		}
-		else
-		{
-			clipSlots[buttonToChannel(data1)].launch(buttonToClip(data1));
-		}
-	}
-	else if (status == LAUNCHPAD_PAD_STATUS && data2 == 127 && launchpadMode == Mode.KEYBOARD)
+	
+	if (status == LAUNCHPAD_PAD_STATUS)
 	{
 		var row = buttonToClip(data1);
 		var column = buttonToChannel(data1);
-		padPressed[column][row] = true;
+		padPressed[column][row] = data2 == 127;
 		updatePad(column, row);
-	}
-	else if (status == LAUNCHPAD_PAD_STATUS && data2 == 0 && launchpadMode == Mode.KEYBOARD)
-	{
-		var row = buttonToClip(data1);
-		var column = buttonToChannel(data1);
-		padPressed[column][row] = false;
-		updatePad(column, row);
+		
+		if (data2 == 127 && launchpadMode == Mode.LAUNCHER)
+		{
+			if (launchpadSideMode == SideMode.SCENES && column == 8)
+			{
+				trackBank.launchScene(row);
+			}
+			else if (launchpadSideMode == SideMode.MAP && column == 8)
+			{
+				trackBank.scrollToScene(row * NUM_SCENES);
+				//sceneBank.scrollTo(buttonToClip(data1) * NUM_SCENES);
+			}
+			else
+			{
+				clipSlots[column].launch(row);
+			}
+		}
+		else if (data2 == 127 && launchpadMode == Mode.KEYBOARD && column == 8)
+		{
+			oldVelocityLevel = velocityLevel;
+			velocityLevel = 8 - row;
+			for (var velocity = 0; velocity < 128; velocity++)
+			{
+				velocityMap[velocity] = 16 * velocityLevel - 1;
+			}
+			LaunchpadNotes.setVelocityTranslationTable(velocityMap);
+			updatePad(8, 8 - oldVelocityLevel);
+		}
+		else if (data2 == 127 && launchpadMode == Mode.KEYBOARD)
+		{
+			var note = isomorphicNotes[row][column]
+			notePressed[note] = true;
+			updatePads();
+		}
+		else if (data2 == 0 && launchpadMode == Mode.KEYBOARD)
+		{
+			var note = isomorphicNotes[row][column];
+			var found = false;
+			for (var i = 0; i < 8; i++)
+			{
+				for (var j = 0; j < 8; j++)
+				{
+					if (note == isomorphicNotes[i][j] && padPressed[i][j])
+					{
+						found = true;
+					}
+				}
+			}
+			if (found == false)
+			{
+				notePressed[note] = false;
+			}
+			updatePads();
+		}
 	}
 }
 

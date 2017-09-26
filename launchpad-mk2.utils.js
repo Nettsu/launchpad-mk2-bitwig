@@ -51,11 +51,11 @@ function setTopColor(button, index)
 
 function queueSysexColor(track, slot, r, g, b)
 {
-	r = r * r * 63;
-	g = g * g * 63;
-	b = b * b * 63;
+	var red = r * r * 63;
+	var green = g * g * 63;
+	var blue = b * b * 63;
 	var buttonInHex = toHex(getButtonNumber(track, slot));
-	var colorString = " " + buttonInHex + " " + toHex(r) + " " + toHex(g) + " " + toHex(b);
+	var colorString = " " + buttonInHex + " " + toHex(red) + " " + toHex(green) + " " + toHex(blue);
 
 	queuedColorUpdates += colorString;
 }
@@ -75,14 +75,14 @@ function setSysexColor(track, slot, r, g, b)
 	// r, g and b are a value between 0 and 1, need to multiply 63 to get Launchpad scope
 	// also launchpad LEDs light up non-linearly, so I make the scale exponential
 
-	r = r * r * 63;
-	g = g * g * 63;
-	b = b * b * 63;
+	var red = r * r * 63;
+	var green = g * g * 63;
+	var blue = b * b * 63;
 
 	//println(r + " " + g + " " + b);
 
 	var buttonInHex = toHex(getButtonNumber(track, slot));
-	var sysexString = SYSEX_HEADER + "0B " + buttonInHex + " " + toHex(r) + " " + toHex(g) + " " + toHex(b) + " F7";
+	var sysexString = SYSEX_HEADER + "0B " + buttonInHex + " " + toHex(red) + " " + toHex(green) + " " + toHex(blue) + " F7";
 	sendSysex(sysexString);
 }
 
@@ -96,6 +96,16 @@ function makeTable(x, y, init)
 		{
 			table[i][j] = init;
 		}
+	}
+	return table;
+}
+
+function makeArray(x, init)
+{
+	var table = new Array(x);
+	for (var i = 0; i < x; i++)
+	{
+		table[i] = init;
 	}
 	return table;
 }
